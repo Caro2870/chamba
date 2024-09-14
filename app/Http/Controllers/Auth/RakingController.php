@@ -36,7 +36,6 @@ class RakingController extends Controller
     public function partialView(Request $request)
     {
 
-        return 1;
         $Rankings = Ranking::where('comunidad_id', Auth::guard('web')->user()->comunidad_id)
         ->where(function ($q) use ($request){
             if($request->filter_torneo){ $q->where('torneo_id', $request->filter_torneo); }

@@ -131,7 +131,6 @@ class HomeController extends Controller
     public function rankingsPartialView(Request $request)
     {
 
-        return 1;
         $Model = Comunidad::where('principal', true)->first();
 
         if($Model != null)

@@ -2424,7 +2424,6 @@ class TorneoController extends Controller
             if(!$entity->buy && ($entity->jugador_local_uno_id == null || $entity->jugador_rival_uno_id == null)) return null;
         }
 
-        return $entity;
 
         return view('auth'.'.'.$this->viewName.'.ajax.final.partialView', ['Model' => $entity, 'Position' => $position, 'ViewName' => ucfirst($this->viewName)]);
     }
