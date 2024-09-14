@@ -1,5 +1,5 @@
 <div class="d-flex justify-content-between align-items-center">
-    <div><h5>Tabla de Posiciones</h5></div>
+    <div><h5>Tabla de Posicionesss</h5></div>
 </div>
 <div class="row mt-1">
     <div class="col-md-12">
