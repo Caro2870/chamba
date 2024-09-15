@@ -1825,6 +1825,77 @@ class TorneoController extends Controller
             }
         }
 
+
+        //aqui
+
+        // Obtener todos los rankings por categoría
+        $rankings = $this->rankingsByCategoryId($TorneoCategoria->categoria_simple_id);
+        $nombreCompletoTemporal = [];
+        $rankings = $rankings['Rankings']->toArray() ?? [];
+
+        $rankingsAssociativeArray = array_combine(
+            array_column($rankings, 'id'),
+            array_column($rankings, 'countRepeat')
+        );
+
+        // 241
+        // Obtener el grupo del jugador local
+        $grupos = DB::table('torneo_grupos')
+        ->where('torneo_categoria_id', $request->torneo_categoria_id)
+        ->select('grupo_id', 'nombre_grupo', 'torneo_id', 'jugador_simple_id')
+        ->get();
+    
+        $gruposAssociativeArray = [];
+        
+        foreach ($grupos as $grupo) {
+            $jugadorId = $grupo->jugador_simple_id;
+            $grupoId = $grupo->grupo_id;
+            $nombreGrupo = $grupo->nombre_grupo;
+        
+            $gruposAssociativeArray[$jugadorId] = [
+                'grupo_id' => $grupoId,
+                'nombre_grupo' => $nombreGrupo,
+                'torneo_id' => $grupo->torneo_id
+            ];
+        }
+        foreach ($JugadoresClasificados as $key => $value) {
+          
+            $JugadoresClasificados[$key]['grupo_nombre'] = $gruposAssociativeArray[$value['id']]['nombre_grupo'];
+            $JugadoresClasificados[$key]['grupo_id'] = $gruposAssociativeArray[$value['id']]['grupo_id'];
+            $JugadoresClasificados[$key]['torneo_id'] = $gruposAssociativeArray[$value['id']]['torneo_id'];
+            // Llamada a la función grupoTablaPosicion
+            $resultado = $this->grupoTablaPosicion($JugadoresClasificados[$key]['torneo_id'], $request->torneo_categoria_id, $JugadoresClasificados[$key]['grupo_id']);
+
+            // ID específico que deseas buscar
+            $idEspecifico = $value['id'];
+            // Filtrar el resultado para obtener el objeto donde jugador_simple_id sea igual a idEspecifico
+            $jugadorFiltradoKeys = array_keys(array_filter($resultado->toArray(), function($jugador) use ($idEspecifico) {
+                return $jugador['jugador_simple_id'] == $idEspecifico;
+            }));
+
+            // Obtener el primer elemento del resultado filtrado
+            $jugadorFiltrado = reset($jugadorFiltradoKeys);
+
+            $JugadoresClasificados[$key]['posicion'] =  $jugadorFiltrado+1;
+
+            if (!empty($rankingsAssociativeArray) && isset($rankingsAssociativeArray[$value['id']])) {
+
+                // Modificar el texto solo si el id está presente en el arreglo asociativo
+                $JugadoresClasificados[$key]['text'] = $value['text'] . ' (' . $rankingsAssociativeArray[$value['id']] . ')';
+              
+            }
+            // agregar al texto el grupo y la posicion
+
+            $JugadoresClasificados[$key]['text'] = $JugadoresClasificados[$key]['text'] . ' - ' . $JugadoresClasificados[$key]['grupo_nombre'] . ' - Posición: ' . $this->numeroOrdinal($JugadoresClasificados[$key]['posicion']);
+
+        }
+        
+        
+        foreach ($grupos as $grupo) {
+         
+        }
+    
+
         return response()->json(['data' => array_values($JugadoresClasificados)]);
     }
 
@@ -2152,12 +2223,15 @@ class TorneoController extends Controller
 
     public function faseFinalPrePartidoPartialView($torneo_id, $torneo_categoria_id, $id, $position, $bracket)
     {
+        //observado
+
+      
         $TorneoCategoria = TorneoCategoria::where('id', $torneo_categoria_id)->where('torneo_id', $torneo_id)
         ->whereHas('torneo', function ($q){$q->where('comunidad_id', Auth::guard('web')->user()->comunidad_id);})->first();
 
         $Partido = Partido::where('id', $id)->where('torneo_categoria_id', $torneo_categoria_id)->where('torneo_id', $torneo_id)
         ->whereHas('torneo', function ($q){$q->where('comunidad_id', Auth::guard('web')->user()->comunidad_id);})->first();
-
+    
         if($TorneoCategoria != null) return view('auth'.'.'.$this->viewName.'.ajax.final.prepartido.partialView', ['TorneoCategoria' => $TorneoCategoria, 'Partido' => $Partido, 'Position' => $position, 'Bracket' => $bracket, 'ViewName' => ucfirst($this->viewName)]);
 
         return  null;
@@ -2516,7 +2590,7 @@ class TorneoController extends Controller
 
     public function rankingsByCategoryId($filter_categoria)
     {
-        $filter_anio = 2024;
+        $filter_anio = null;
 
         $Model = Comunidad::where('principal', true)->first();
 
@@ -2535,6 +2609,8 @@ class TorneoController extends Controller
             })->toArray())) : [];
 
             $TorneoCategorias = TorneoCategoria::whereIn('id', array_values(array_unique(array_filter($Rankings->pluck('torneo_categoria_id')->toArray()))))->orderBy('id', 'desc')->get();
+           
+           
             $Categorias = Categoria::whereIn('id', array_values(array_unique(array_filter($TorneoCategorias->pluck('categoria_simple_id')->toArray()))))
                 ->where('visible', true)->where('id', '!=', 3)->where('orden', '>', '0')
                 ->where(function ($q) use ($filter_categoria) {
@@ -2655,6 +2731,8 @@ class TorneoController extends Controller
 
             $result = [];
 
+            
+
             foreach ($RankingsResult as $q2) {
                 $countSingle = 0;
                 $countRepeat = 1;
@@ -2668,21 +2746,13 @@ class TorneoController extends Controller
                         $countSingle += 1;
                         $pointBefore = $q3['puntos'];
                         $countRepeat = $next ? $countRepeat : $countSingle;
-        
-                        $aniosData = [];
-                        foreach ($Anios as $q4) {
-                            $anioData = collect($q3['anios'])->where('anio', $q4)->first();
-                            $aniosData[] = [
-                                'anio' => $q4,
-                                'puntos' => $anioData ? $anioData->puntos : 0
-                            ];
-                        }
+                        
+                        
         
                         $result[] = [
                             'countRepeat' => $countRepeat,
                             'nombre' => $q3['nombre'],
                             'puntos' => $q3['puntos'],
-                            'anios' => $aniosData,
                             'id' => $q3['id']
                         ];
         
@@ -2708,6 +2778,8 @@ class TorneoController extends Controller
             abort(404);
         }
     }
+
+
 
     public function faseFinalPartidoStore(Request $request)
     {
